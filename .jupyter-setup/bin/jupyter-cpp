@@ -1,0 +1,143 @@
+#!/bin/bash
+# 主控脚本 - C++ Jupyter环境管理工具
+
+# 获取脚本目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# 加载函数库
+source "$SCRIPT_DIR/lib/common.sh"
+source "$SCRIPT_DIR/lib/jupyter_setup.sh"
+source "$SCRIPT_DIR/lib/jupyter_run.sh"
+source "$SCRIPT_DIR/lib/browser_config.sh"
+
+# 处理命令行参数
+parse_args() {
+    COMMAND=""
+    JUPYTER_PORT=8888
+    JUPYTER_BG=false
+    FORCE_BROWSER=false
+    JUPYTER_CUSTOM_DIR=""
+    
+    # 如果没有参数，显示帮助
+    if [ $# -eq 0 ]; then
+        show_help
+        exit 0
+    fi
+    
+    # 解析第一个参数为命令
+    COMMAND="$1"
+    shift
+    
+    # 解析其他参数
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --port=*)
+                JUPYTER_PORT="${1#*=}"
+                ;;
+            --bg)
+                JUPYTER_BG=true
+                ;;
+            --force-browser)
+                FORCE_BROWSER=true
+                ;;
+            --dir=*)
+                JUPYTER_CUSTOM_DIR="${1#*=}"
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "未知选项: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+        shift
+    done
+    
+    # 导出变量供其他模块使用
+    export JUPYTER_PORT
+    export JUPYTER_BG
+    export FORCE_BROWSER
+    export JUPYTER_CUSTOM_DIR
+}
+
+# 主函数
+main() {
+    # 解析命令行参数
+    parse_args "$@"
+    
+    # 根据命令执行相应操作
+    case "$COMMAND" in
+        setup)
+            setup_cpp_jupyter
+            ;;
+        lab)
+            if [ "$FORCE_BROWSER" = true ]; then
+                # 强制打开浏览器模式
+                log_info "已启用强制打开浏览器模式"
+                export AUTO_OPEN_BROWSER=true
+            fi
+            start_lab "$JUPYTER_PORT"
+            ;;
+        notebook)
+            if [ "$FORCE_BROWSER" = true ]; then
+                # 强制打开浏览器模式
+                log_info "已启用强制打开浏览器模式"
+                export AUTO_OPEN_BROWSER=true
+            fi
+            start_notebook "$JUPYTER_PORT"
+            ;;
+        browser)
+            configure_browser
+            ;;
+        dir)
+            configure_jupyter_dir
+            ;;
+        help)
+            show_help
+            ;;
+        *)
+            log_error "未知命令: $COMMAND"
+            show_help
+            exit 1
+            ;;
+    esac
+    
+    return $?
+}
+
+# 显示帮助信息
+show_help() {
+    echo "Jupyter C++环境工具 - 帮助信息"
+    echo "用法: jupyter-cpp [命令] [参数]"
+    echo
+    echo "可用命令:"
+    echo "  setup       设置C++ Jupyter环境"
+    echo "  notebook    启动Jupyter Notebook"
+    echo "  lab         启动JupyterLab (默认)"
+    echo "  browser     配置浏览器设置"
+    echo "  dir         配置工作目录"
+    echo "  help        显示此帮助信息"
+    echo
+    echo "选项:"
+    echo "  --port=XXXX       指定端口号 (默认: 8888)"
+    echo "  --bg              在后台运行"
+    echo "  --force-browser   强制打开浏览器(忽略配置)"
+    echo "  --dir=PATH        指定工作目录(覆盖配置)"
+    echo
+    echo "示例:"
+    echo "  jupyter-cpp setup                  # 安装和配置C++ Jupyter环境"
+    echo "  jupyter-cpp lab                    # 启动JupyterLab"
+    echo "  jupyter-cpp notebook               # 启动Jupyter Notebook"
+    echo "  jupyter-cpp lab --force-browser    # 启动JupyterLab并强制打开浏览器"
+    echo "  jupyter-cpp lab --dir=/path/to/dir # 在指定目录启动JupyterLab"
+    echo "  jupyter-cpp browser                # 配置浏览器设置"
+    echo "  jupyter-cpp dir                    # 配置工作目录"
+    echo
+}
+
+# 运行主函数
+main "$@"
+exit $? 

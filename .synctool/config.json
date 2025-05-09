@@ -1,0 +1,30 @@
+{
+    "md_dir": "/mnt/d/Document/Obsidian/TecAccumulation/mdtest",
+    "ipynb_dir": "/mnt/d/Document/Obsidian/TecAccumulation/ipynbtest",
+    "md_extensions": [
+        ".md"
+    ],
+    "ipynb_extensions": [
+        ".ipynb"
+    ],
+    "ignore_patterns": [
+        ".*",
+        "__pycache__",
+        ".ipynb_checkpoints",
+        ".git",
+        ".vscode",
+        "node_modules"
+    ],
+    "debounce_delay": 0.8,
+    "watch_interval": 1.0,
+    "sync_on_start": true,
+    "check_on_start": true,
+    "bidirectional_sync": true,
+    "conflict_resolution": "newer",
+    "delete_orphaned": true,
+    "default_language": "c++",
+    "preserve_output": false,
+    "execution_count": true,
+    "time_threshold": 5,
+    "log_level": "INFO"
+}
