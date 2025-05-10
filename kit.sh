@@ -19,6 +19,20 @@ NC='\033[0m' # No Color
 JUPYTER_TOOL="$SCRIPT_DIR/.jupyter-setup/bin/jupyter-cpp"
 SYNC_TOOL_DIR="$SCRIPT_DIR/.synctool/src"
 
+# ====== Conda 环境配置（全局统一） ======
+CONDA_ENV_NAME="cpp"
+CONDA_SH_PATH="$HOME/miniconda3/etc/profile.d/conda.sh"
+
+function activate_conda_env {
+    if [ -f "$CONDA_SH_PATH" ]; then
+        source "$CONDA_SH_PATH"
+        conda activate "$CONDA_ENV_NAME"
+    else
+        echo -e "${RED}错误: 未找到 conda.sh ($CONDA_SH_PATH)，请检查 Miniconda/Anaconda 安装路径${NC}"
+        return 1
+    fi
+}
+
 # 显示工具列表
 function show_tools {
     echo -e "${BLUE}===== CodeLearningKit 工具集 =====${NC}"
@@ -155,6 +169,9 @@ function handle_jupyter {
         return
     fi
     
+    # 激活 conda 环境（传递环境名参数）
+    activate_conda_env "$CONDA_ENV_NAME" || return 1
+
     # 直接调用jupyter-cpp脚本
     echo -e "${GREEN}[Jupyter工具]${NC} 执行命令: $@"
     bash "$JUPYTER_TOOL" "$@"
@@ -173,9 +190,12 @@ function handle_sync {
         return
     fi
     
-    # 使用Python执行同步工具
+    # 激活 conda 环境（传递环境名参数）
+    activate_conda_env "$CONDA_ENV_NAME" || return 1
+
     echo -e "${GREEN}[同步工具]${NC} 执行命令"
-    python -m "$SCRIPT_DIR".synctool.src.main "$@"
+    # 直接调用synctool.py脚本
+    python "$SCRIPT_DIR/.synctool/synctool.py" "$@"
 }
 
 # 主函数

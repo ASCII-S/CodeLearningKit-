@@ -1,5 +1,13 @@
 #!/bin/bash
 # 主控脚本 - C++ Jupyter环境管理工具
+# 捕获 SIGINT 和 SIGTERM 信号，杀掉所有子进程
+cleanup() {
+    echo "正在清理子进程..."
+    # 杀掉所有由本脚本启动的子进程
+    pkill -P $$
+    exit 0
+}
+trap cleanup SIGINT SIGTERM
 
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

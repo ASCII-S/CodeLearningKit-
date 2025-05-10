@@ -56,9 +56,11 @@ class SyncFileHandler(FileSystemEventHandler):
             path = event.src_path
             logger.debug(f"{Color.CYAN}[文件修改] 检测到文件修改: {path}{Color.RESET}")
             
-            # 特别检查是否为ipynb文件
+            # 特别检查是否为ipynb或md文件
             if path.endswith('.ipynb'):
                 logger.info(f"{Color.GREEN}[IPYNB修改] 检测到IPYNB文件修改: {path}{Color.RESET}")
+            elif path.endswith('.md'):
+                logger.info(f"{Color.GREEN}[MD修改] 检测到MD文件修改: {path}{Color.RESET}")
             
             self.engine.handle_file_event(Path(path), "modified")
     
@@ -72,9 +74,11 @@ class SyncFileHandler(FileSystemEventHandler):
             path = event.src_path
             logger.debug(f"{Color.CYAN}[文件创建] 检测到文件创建: {path}{Color.RESET}")
             
-            # 特别检查是否为ipynb文件
+            # 特别检查是否为ipynb或md文件
             if path.endswith('.ipynb'):
                 logger.info(f"{Color.GREEN}[IPYNB创建] 检测到IPYNB文件创建: {path}{Color.RESET}")
+            elif path.endswith('.md'):
+                logger.info(f"{Color.GREEN}[MD创建] 检测到MD文件创建: {path}{Color.RESET}")
                 
             self.engine.handle_file_event(Path(path), "created")
     
@@ -88,9 +92,11 @@ class SyncFileHandler(FileSystemEventHandler):
             dest_path = event.dest_path
             logger.debug(f"{Color.CYAN}[文件移动] 检测到文件移动: {event.src_path} -> {dest_path}{Color.RESET}")
             
-            # 特别检查是否为ipynb文件
+            # 特别检查是否为ipynb或md文件
             if dest_path.endswith('.ipynb'):
                 logger.info(f"{Color.GREEN}[IPYNB移动] 检测到IPYNB文件移动: {event.src_path} -> {dest_path}{Color.RESET}")
+            elif dest_path.endswith('.md'):
+                logger.info(f"{Color.GREEN}[MD移动] 检测到MD文件移动: {event.src_path} -> {dest_path}{Color.RESET}")
                 
             self.engine.handle_file_event(Path(dest_path), "moved")
             
@@ -106,9 +112,11 @@ class SyncFileHandler(FileSystemEventHandler):
             
             logger.debug(f"{Color.CYAN}[文件删除] 检测到文件删除: {path}{Color.RESET}")
             
-            # 特别检查是否为ipynb文件
+            # 特别检查是否为ipynb或md文件
             if path_str.endswith('.ipynb'):
                 logger.info(f"{Color.GREEN}[IPYNB删除] 检测到IPYNB文件删除: {path}{Color.RESET}")
+            elif path_str.endswith('.md'):
+                logger.info(f"{Color.GREEN}[MD删除] 检测到MD文件删除: {path}{Color.RESET}")
             
             # 避免重复处理同一个删除事件
             if path_str in self.processed_deletes:
@@ -167,7 +175,10 @@ class FileWatcher:
         
         # 确保目录存在
         self.md_dir.mkdir(parents=True, exist_ok=True)
-        self.ipynb_dir.mkdir(parents=True, exist_ok=True)
+        if not self.ipynb_dir.exists():
+            self.ipynb_dir.mkdir(parents=True, exist_ok=True)
+        elif not self.ipynb_dir.is_dir():
+            raise NotADirectoryError(f"{self.ipynb_dir} 已存在但不是目录！")
         
         # 事件队列，用于去抖动处理
         self.pending_events = defaultdict(lambda: {'timestamp': 0, 'type': None, 'path': None})
@@ -193,9 +204,9 @@ class FileWatcher:
         self.handler = SyncFileHandler(self.sync_engine)
         self.ipynb_handler = SyncFileHandler(self.sync_engine)  # 为ipynb创建单独的处理器
         
-        # 为MD文件夹使用标准观察者
-        self.observer = Observer()
-        logger.info(f"{Color.GREEN}开始监控目录(标准): {self.md_dir} (含子目录){Color.RESET}")
+        # 为MD文件夹也使用轮询观察者，以确保在WSL环境中也能工作
+        self.observer = PollingObserver()
+        logger.info(f"{Color.GREEN}开始监控目录(轮询): {self.md_dir} (含子目录){Color.RESET}")
         self.observer.schedule(self.handler, str(self.md_dir), recursive=True)
         
         # 为IPYNB文件夹使用轮询观察者，以确保在WSL环境中也能工作
@@ -265,25 +276,34 @@ class FileWatcher:
         logger.debug(f"{Color.GRAY}[轮询] 检查文件变化{Color.RESET}")
         
         # 检查ipynb目录的文件
-        changed_files = self.check_directory_changes(self.ipynb_dir)
+        changed_files_ipynb = self.check_directory_changes(self.ipynb_dir)
+        
+        # 检查md目录的文件
+        changed_files_md = self.check_directory_changes(self.md_dir)
+        
+        # 合并变化文件列表
+        changed_files = changed_files_ipynb + changed_files_md
         
         # 处理变化的文件
         for file_path, change_type in changed_files:
-            # 只处理ipynb文件
-            if file_path.endswith('.ipynb'):
+            # 处理ipynb和md文件
+            if file_path.endswith('.ipynb') or file_path.endswith('.md'):
                 logger.info(f"{Color.GREEN}[检测变化] {change_type} 文件: {file_path}{Color.RESET}")
                 # 创建一个合成事件
                 event = FileSystemEvent(file_path)
                 event.event_type = change_type
                 event.is_directory = False
                 
+                # 根据文件类型选择合适的处理器
+                handler = self.ipynb_handler if file_path.endswith('.ipynb') else self.handler
+                
                 # 手动触发处理器
                 if change_type == 'modified':
-                    self.ipynb_handler.on_modified(event)
+                    handler.on_modified(event)
                 elif change_type == 'created':
-                    self.ipynb_handler.on_created(event)
+                    handler.on_created(event)
                 elif change_type == 'deleted':
-                    self.ipynb_handler.on_deleted(event)
+                    handler.on_deleted(event)
     
     def check_directory_changes(self, directory):
         """检查目录中的文件变化
